@@ -562,8 +562,8 @@ function resize!(it::CachedIterator,n::Integer)
         for (k, v) in enumerate(it_section)
             it.storage[m+k] = v
         end
+        it.numcached = n
     end
-    it.numcached = n
     it
 end
 
@@ -576,8 +576,7 @@ end
 
 Base.keys(c::CachedIterator) = oneto(length(c))
 
-function iterate(it::CachedIterator,st=1)
-    @assert isfinite(st)
+function iterate(it::CachedIterator, st::Int=1)
     st > length(it) && return nothing
     (it[st], st+1)
 end
