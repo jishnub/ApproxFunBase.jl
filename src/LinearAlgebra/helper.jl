@@ -536,35 +536,34 @@ columnrange(A,row::Integer) = max(1,row-bandwidth(A,1)):row+bandwidth(A,2)
 
 
 ## Store iterator
-mutable struct CachedIterator{T,IT}
+mutable struct CachedIterator{T,IT,L}
     iterator::IT
     storage::Vector{T}
-    state
-    length::Int
+    len::L
+    numcached::Int
 end
 
-CachedIterator{T,IT}(it::IT, state) where {T,IT} = CachedIterator{T,IT}(it,T[],state,0)
-CachedIterator(it::IT) where IT = CachedIterator{eltype(it),IT}(it, ())
+function CachedIterator{T,IT}(it::IT, l::L) where {T,IT,L<:Union{Int, InfiniteCardinal{0}}}
+    v = Vector{T}(undef, isfinite(l) ? l : 0)
+    CachedIterator{T,IT,L}(it, v, l, 0)
+end
+CachedIterator{T}(it) where {T} = CachedIterator{T, typeof(it)}(it, length(it))
+CachedIterator(it) = CachedIterator{eltype(it)}(Iterators.Stateful(it))
 
 function resize!(it::CachedIterator,n::Integer)
-    m = it.length
+    m = it.numcached
     if n > m
         if n > length(it.storage)
             resize!(it.storage,2n)
         end
 
-        @inbounds for k = m+1:n
-            xst = iterate(it.iterator,it.state...)
-            if xst === nothing
-                it.length = k-1
-                return it
-            end
-            it.storage[k] = xst[1]
-            it.state = (xst[2],)
-        end
+        it_section = Iterators.take(it.iterator, length(m+1:n))
 
-        it.length = n
+        for (k, v) in enumerate(it_section)
+            it.storage[m+k] = v
+        end
     end
+    it.numcached = n
     it
 end
 
@@ -577,17 +576,15 @@ end
 
 Base.keys(c::CachedIterator) = oneto(length(c))
 
-iterate(it::CachedIterator) = iterate(it,1)
-function iterate(it::CachedIterator,st::Int)
-    if  st == it.length + 1 && iterate(it.iterator,it.state...) === nothing
-        nothing
-    else
-        (it[st],st+1)
-    end
+function iterate(it::CachedIterator,st=1)
+    @assert isfinite(st)
+    st > length(it) && return nothing
+    (it[st], st+1)
 end
 
 function getindex(it::CachedIterator, k)
     mx = maximum(k)
+    @assert isfinite(mx)
     if mx > length(it) || mx < 1
         throw(BoundsError(it,k))
     end
@@ -598,7 +595,7 @@ end
 @deprecate findfirst(A::CachedIterator, x) findfirst(x, A::CachedIterator)
 findfirst(x::T, A::CachedIterator{T}) where {T} = findfirst(==(x), A)
 
-length(A::CachedIterator) = length(A.iterator)
+length(A::CachedIterator) = A.len
 
 ## nocat
 vnocat(A...) = Base.vect(A...)
