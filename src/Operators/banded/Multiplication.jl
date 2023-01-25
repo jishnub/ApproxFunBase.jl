@@ -72,7 +72,8 @@ getindex(D::ConcreteMultiplication{F,UnsetSpace,T},k::Integer,j::Integer) where 
     error("No range space attached to Multiplication")
 
 
-
+*(A::ConcreteMultiplication, B::ConcreteMultiplication) =
+    ConcreteMultiplication(A.f * B.f, B.space)
 
 
 
@@ -140,7 +141,7 @@ function default_mult(f::Fun,g::Fun)
     if domainscompatible(space(f),space(g))
         default_mult_compatible(f, g)
     else
-        sp=union(space(f),space(g))::Space
+        sp=union(space(f),space(g))
         fnew = Fun(f,sp)
         gnew = Fun(g,sp)
         default_mult_compatible(fnew, gnew)

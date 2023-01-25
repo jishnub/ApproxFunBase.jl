@@ -194,7 +194,7 @@ end
             sp = PointSpace(1:3)
             coeff = [1:3;]
             f = Fun(sp, coeff)
-            for sp2 in Any[(), (sp,)]
+            for sp2 in ((), (sp,))
                 M = Multiplication(f, sp2...)
                 a = (M * M) * M
                 b = M * (M * M)
@@ -203,7 +203,7 @@ end
             end
             @testset "unwrap TimesOperator" begin
                 M = Multiplication(f)
-                for ops in (Operator{Float64}[M, M * M], Operator{Float64}[M*M, M])
+                for ops in (Operator{Float64}[M, TimesOperator(M, M)], Operator{Float64}[TimesOperator(M, M), M])
                     @test TimesOperator(ops).ops == [M, M, M]
                 end
             end
@@ -213,15 +213,18 @@ end
             TM = @inferred TimesOperator(T, M)
             MT = @inferred TimesOperator(M, T)
             TT = @inferred TimesOperator(T, T)
-            @test T == M * M
-            @test TM == T * M
-            @test MT == M * T
-            @test T * M == M * T == M * M * M
-            @test TT == T * T == M * M * M * M
+            M2 = @inferred M * M
+            M3 = @inferred M2 * M
+            M4 = @inferred M3 * M
+            @test T * f == M2 * f
+            @test TM * f == (T * M) * f
+            @test MT * f == (M * T) * f
+            @test (T * M) * f == (M * T) * f == M3 * f
+            @test TT * f == (T * T) * f == M4 * f
             @test (@inferred adjoint(T)) == adjoint(M) * adjoint(M)
 
             M = Multiplication(f, sp)
-            @test M^2 == M * M == (T : sp)
+            @test M^2 * f == M2 * f == (T : sp) * f
         end
         @testset "plus operator" begin
             c = [1,2,3]
@@ -505,7 +508,7 @@ end
                 blk = ApproxFunBase.block(t, i)
                 @test i ∈ ApproxFunBase.blockrange(t, blk)
                 @test vi == t[i]
-                @test findfirst(t, vi) == i
+                @test findfirst(vi, t) == i
             end
         end
         @testset "nD" begin
@@ -525,7 +528,7 @@ end
         v = collect(Iterators.take(t, 16))
         @test eltype(v) == eltype(t)
         @testset for (i, vi) in enumerate(v)
-            @test findfirst(t, vi) == i
+            @test findfirst(vi, t) == i
         end
     end
     @testset "cache" begin
